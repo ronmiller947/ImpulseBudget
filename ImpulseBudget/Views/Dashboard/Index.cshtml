@@ -1,0 +1,47 @@
+﻿@model ImpulseBudget.Controllers.DashboardViewModel
+
+@{
+    ViewData["Title"] = "Dashboard";
+}
+
+<div class="container mt-4">
+    <h2>Impulse Budget Dashboard</h2>
+
+    <div class="row mt-3">
+        <div class="col-md-3 col-6 mb-3">
+            <div class="card">
+                <div class="card-body">
+                    <h6>Income Sources</h6>
+                    <h3>@Model.IncomeSourceCount</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6 mb-3">
+            <div class="card">
+                <div class="card-body">
+                    <h6>Bills</h6>
+                    <h3>@Model.BillCount</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6 mb-3">
+            <div class="card">
+                <div class="card-body">
+                    <h6>Debts</h6>
+                    <h3>@Model.DebtCount</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6 mb-3">
+            <div class="card">
+                <div class="card-body">
+                    <h6>Transactions</h6>
+                    <h3>@Model.TransactionCount</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <h4 class="mt-4">Projection (coming soon)</h4>
+    <p>Once we wire in the projection engine, a week-by-week table will appear here.</p>
+</div>
