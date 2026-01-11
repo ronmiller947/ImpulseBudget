@@ -1,4 +1,4 @@
-﻿@model ImpulseBudget.Controllers.DashboardViewModel
+﻿@model ImpulseBudget.Models.DashboardViewModel
 
 @{
     ViewData["Title"] = "Dashboard";
@@ -44,22 +44,18 @@
 
     <hr />
 
-    <form method="get" class="row gy-2 gx-3 align-items-end mb-3">
-        <div class="col-auto">
-            <label for="startingBalance" class="form-label">Starting Balance</label>
-            <input type="number"
-                   step="0.01"
-                   class="form-control"
-                   id="startingBalance"
-                   name="startingBalance"
-                   value="@Model.StartingBalance" />
+    <div class="card mb-3">
+        <div class="card-body">
+            <h5 class="card-title">Current Balance</h5>
+            <p class="card-text display-6">
+                @Model.CurrentBalance.ToString("C")
+            </p>
+            <p class="text-muted">
+                Based on starting balance and all transactions since @* starting date, if you want to show it later *@
+            </p>
         </div>
-        <div class="col-auto">
-            <button type="submit" class="btn btn-primary">
-                Recalculate Projection
-            </button>
-        </div>
-    </form>
+    </div>
+
 
     <h4>Next 26 Weeks Projection</h4>
 

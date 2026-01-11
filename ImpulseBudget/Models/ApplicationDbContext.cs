@@ -13,5 +13,6 @@ namespace ImpulseBudget.Models
         public DbSet<Bill> Bills { get; set; }
         public DbSet<Debt> Debts { get; set; }
         public DbSet<BankTransaction> BankTransactions { get; set; }
+        public DbSet<BudgetSettings> BudgetSettings { get; set; }
     }
 }

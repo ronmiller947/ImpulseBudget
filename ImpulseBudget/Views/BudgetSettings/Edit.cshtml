@@ -1,0 +1,38 @@
+﻿@model ImpulseBudget.Models.BudgetSettings
+
+@{
+    ViewData["Title"] = "Starting Balance";
+}
+
+<div class="container mt-4">
+    <h2>Starting Balance</h2>
+
+    @if (ViewBag.Message != null)
+    {
+        <div class="alert alert-success">@ViewBag.Message</div>
+    }
+
+    <form asp-action="Edit" method="post">
+        @Html.AntiForgeryToken()
+
+        <div class="mb-3">
+            <label asp-for="StartingBalance" class="form-label"></label>
+            <input asp-for="StartingBalance" class="form-control" />
+            <span asp-validation-for="StartingBalance" class="text-danger"></span>
+        </div>
+
+        <div class="mb-3">
+            <label asp-for="StartingBalanceDate" class="form-label"></label>
+            <input asp-for="StartingBalanceDate" type="date" class="form-control" />
+            <span asp-validation-for="StartingBalanceDate" class="text-danger"></span>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Save</button>
+    </form>
+</div>
+
+@section Scripts {
+    @{
+        await Html.RenderPartialAsync("_ValidationScriptsPartial");
+    }
+}

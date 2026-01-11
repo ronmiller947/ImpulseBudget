@@ -15,6 +15,7 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 
 builder.Services.AddScoped<BudgetProjectionService>();
 builder.Services.AddScoped<RecurringDetectionService>();
+builder.Services.AddScoped<BalanceService>();
 
 builder.Services.AddControllersWithViews();
 

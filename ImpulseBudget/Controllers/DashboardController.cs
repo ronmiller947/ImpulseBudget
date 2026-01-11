@@ -9,27 +9,32 @@ namespace ImpulseBudget.Controllers
     {
         private readonly ApplicationDbContext _db;
         private readonly BudgetProjectionService _projectionService;
+        private readonly BalanceService _balanceService;
 
         public DashboardController(
             ApplicationDbContext db,
-            BudgetProjectionService projectionService)
+            BudgetProjectionService projectionService,
+            BalanceService balanceService)
         {
             _db = db;
             _projectionService = projectionService;
+            _balanceService = balanceService;
         }
 
         // startingBalance is optional query parameter (?startingBalance=123.45)
-        public async Task<IActionResult> Index(decimal? startingBalance)
+        public async Task<IActionResult> Index()
         {
             var incomeCount = await _db.IncomeSources.CountAsync();
             var billCount = await _db.Bills.CountAsync();
             var debtCount = await _db.Debts.CountAsync();
             var txCount = await _db.BankTransactions.CountAsync();
 
-            var startBal = startingBalance ?? 0m;
+            var startBal = await _balanceService.GetCurrentBalanceAsync();
 
             var projection = await _projectionService
                 .GetWeeklyProjectionAsync(startBal, weeks: 26);
+
+            var currentBal = await _balanceService.GetCurrentBalanceAsync();
 
             var model = new DashboardViewModel
             {
@@ -38,22 +43,11 @@ namespace ImpulseBudget.Controllers
                 DebtCount = debtCount,
                 TransactionCount = txCount,
                 StartingBalance = startBal,
-                Projection = projection
+                Projection = projection,
+                CurrentBalance = currentBal
             };
 
             return View(model);
         }
-    }
-
-    public class DashboardViewModel
-    {
-        public int IncomeSourceCount { get; set; }
-        public int BillCount { get; set; }
-        public int DebtCount { get; set; }
-        public int TransactionCount { get; set; }
-
-        public decimal StartingBalance { get; set; }
-
-        public List<ProjectionPoint> Projection { get; set; } = new();
     }
 }
