@@ -1,0 +1,105 @@
+﻿@model ImpulseBudget.Controllers.ImportResultViewModel
+
+@{
+    ViewData["Title"] = "CSV Import";
+}
+
+<div class="container mt-4">
+    <h2>CSV Import</h2>
+
+    @if (Model.Errors != null && Model.Errors.Any())
+    {
+        <div class="alert alert-danger">
+            <h5>Import failed</h5>
+            <ul>
+                @foreach (var err in Model.Errors)
+                {
+                    <li>@err</li>
+                }
+            </ul>
+            <p>No data was imported because one or more validation errors were found.</p>
+        </div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(Model.SuccessMessage))
+    {
+        <div class="alert alert-success">
+            @Model.SuccessMessage
+        </div>
+    }
+
+    <div class="alert alert-info mt-3">
+        <h5 class="mb-2">Frequency options</h5>
+        <p class="mb-1">Use these exact values in the <strong>Frequency</strong> column for Income and Bills CSVs:</p>
+        <ul class="mb-0">
+            <li><strong>OneTime</strong> – A single, one-off payment</li>
+            <li><strong>Weekly</strong> – Once every week</li>
+            <li><strong>BiWeekly</strong> – Once every 2 weeks</li>
+            <li><strong>SemiMonthly</strong> – Twice a month (e.g., 1st and 15th)</li>
+            <li><strong>Monthly</strong> – Once every month</li>
+            <li><strong>Yearly</strong> – Once per year</li>
+        </ul>
+    </div>
+
+    <div class="row mt-3">
+        <div class="col-md-4 mb-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5>Import Income</h5>
+                    <p>
+                        1) <a asp-action="DownloadIncomeTemplate">Download the income template</a><br />
+                        2) Fill it out<br />
+                        3) Upload the CSV
+                    </p>
+
+                    <form asp-action="ImportIncome" method="post" enctype="multipart/form-data">
+                        <div class="mb-2">
+                            <input type="file" name="file" class="form-control" accept=".csv" />
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-sm">Upload Income CSV</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4 mb-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5>Import Bills</h5>
+                    <p>
+                        1) <a asp-action="DownloadBillsTemplate">Download the bills template</a><br />
+                        2) Fill it out<br />
+                        3) Upload the CSV
+                    </p>
+
+                    <form asp-action="ImportBills" method="post" enctype="multipart/form-data">
+                        <div class="mb-2">
+                            <input type="file" name="file" class="form-control" accept=".csv" />
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-sm">Upload Bills CSV</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4 mb-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5>Import Debts</h5>
+                    <p>
+                        1) <a asp-action="DownloadDebtsTemplate">Download the debts template</a><br />
+                        2) Fill it out<br />
+                        3) Upload the CSV
+                    </p>
+
+                    <form asp-action="ImportDebts" method="post" enctype="multipart/form-data">
+                        <div class="mb-2">
+                            <input type="file" name="file" class="form-control" accept=".csv" />
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-sm">Upload Debts CSV</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
