@@ -9,22 +9,22 @@ using ImpulseBudget.Models;
 
 namespace ImpulseBudget.Controllers
 {
-    public class BillsController : Controller
+    public class BankTransactionsController : Controller
     {
         private readonly ApplicationDbContext _context;
 
-        public BillsController(ApplicationDbContext context)
+        public BankTransactionsController(ApplicationDbContext context)
         {
             _context = context;
         }
 
-        // GET: Bills
+        // GET: BankTransactions
         public async Task<IActionResult> Index()
         {
-            return View(await _context.Bills.ToListAsync());
+            return View(await _context.BankTransactions.ToListAsync());
         }
 
-        // GET: Bills/Details/5
+        // GET: BankTransactions/Details/5
         public async Task<IActionResult> Details(int? id)
         {
             if (id == null)
@@ -32,39 +32,47 @@ namespace ImpulseBudget.Controllers
                 return NotFound();
             }
 
-            var bill = await _context.Bills
+            var bankTransaction = await _context.BankTransactions
                 .FirstOrDefaultAsync(m => m.Id == id);
-            if (bill == null)
+            if (bankTransaction == null)
             {
                 return NotFound();
             }
 
-            return View(bill);
+            return View(bankTransaction);
         }
 
-        // GET: Bills/Create
+        // GET: BankTransactions/Create
         public IActionResult Create()
         {
             return View();
         }
 
-        // POST: Bills/Create
+        // POST: BankTransactions/Create
         // To protect from overposting attacks, enable the specific properties you want to bind to.
         // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create([Bind("Id,Name,Amount,Frequency,NextDueDate,IsPastDue,PastDueAmount,IsEssential,IsActive")] Bill bill)
+        public async Task<IActionResult> Create([Bind("Id,Date,Description,Amount,Category,IsIncoming")] BankTransaction bankTransaction)
         {
             if (ModelState.IsValid)
             {
-                _context.Add(bill);
+                // Normalize sign based on direction:
+                // Incoming = positive; Outgoing = negative
+                var absAmount = Math.Abs(bankTransaction.Amount);
+                bankTransaction.Amount = bankTransaction.IsIncoming ? absAmount : -absAmount;
+
+                bankTransaction.IsImported = false; // manual entry
+
+                _context.Add(bankTransaction);
                 await _context.SaveChangesAsync();
                 return RedirectToAction(nameof(Index));
             }
-            return View(bill);
+
+            return View(bankTransaction);
         }
 
-        // GET: Bills/Edit/5
+        // GET: BankTransactions/Edit/5
         public async Task<IActionResult> Edit(int? id)
         {
             if (id == null)
@@ -72,50 +80,47 @@ namespace ImpulseBudget.Controllers
                 return NotFound();
             }
 
-            var bill = await _context.Bills.FindAsync(id);
-            if (bill == null)
+            var bankTransaction = await _context.BankTransactions.FindAsync(id);
+            if (bankTransaction == null)
             {
                 return NotFound();
             }
-            return View(bill);
+            return View(bankTransaction);
         }
 
-        // POST: Bills/Edit/5
+        // POST: BankTransactions/Edit/5
         // To protect from overposting attacks, enable the specific properties you want to bind to.
         // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Edit(int id, [Bind("Id,Name,Amount,Frequency,NextDueDate,IsPastDue,PastDueAmount,IsEssential,IsActive")] Bill bill)
+        public async Task<IActionResult> Edit(int id, [Bind("Id,Date,Description,Amount,Category,IsIncoming,IsImported")] BankTransaction bankTransaction)
         {
-            if (id != bill.Id)
-            {
-                return NotFound();
-            }
+            if (id != bankTransaction.Id) return NotFound();
 
             if (ModelState.IsValid)
             {
                 try
                 {
-                    _context.Update(bill);
+                    var absAmount = Math.Abs(bankTransaction.Amount);
+                    bankTransaction.Amount = bankTransaction.IsIncoming ? absAmount : -absAmount;
+
+                    _context.Update(bankTransaction);
                     await _context.SaveChangesAsync();
                 }
                 catch (DbUpdateConcurrencyException)
                 {
-                    if (!BillExists(bill.Id))
-                    {
+                    if (!BankTransactionExists(bankTransaction.Id))
                         return NotFound();
-                    }
                     else
-                    {
                         throw;
-                    }
                 }
+
                 return RedirectToAction(nameof(Index));
             }
-            return View(bill);
+            return View(bankTransaction);
         }
 
-        // GET: Bills/Delete/5
+        // GET: BankTransactions/Delete/5
         public async Task<IActionResult> Delete(int? id)
         {
             if (id == null)
@@ -123,49 +128,34 @@ namespace ImpulseBudget.Controllers
                 return NotFound();
             }
 
-            var bill = await _context.Bills
+            var bankTransaction = await _context.BankTransactions
                 .FirstOrDefaultAsync(m => m.Id == id);
-            if (bill == null)
+            if (bankTransaction == null)
             {
                 return NotFound();
             }
 
-            return View(bill);
+            return View(bankTransaction);
         }
 
-        // POST: Bills/Delete/5
+        // POST: BankTransactions/Delete/5
         [HttpPost, ActionName("Delete")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteConfirmed(int id)
         {
-            var bill = await _context.Bills.FindAsync(id);
-            if (bill != null)
+            var bankTransaction = await _context.BankTransactions.FindAsync(id);
+            if (bankTransaction != null)
             {
-                _context.Bills.Remove(bill);
+                _context.BankTransactions.Remove(bankTransaction);
             }
 
             await _context.SaveChangesAsync();
             return RedirectToAction(nameof(Index));
         }
 
-        private bool BillExists(int id)
+        private bool BankTransactionExists(int id)
         {
-            return _context.Bills.Any(e => e.Id == id);
-        }
-
-        public IActionResult CreateFromTransaction(string description, decimal amount)
-        {
-            var model = new Bill
-            {
-                Name = description,
-                Amount = amount,
-                Frequency = Frequency.Monthly,
-                NextDueDate = DateTime.Today,
-                IsEssential = true,
-                IsActive = true
-            };
-
-            return View("Create", model);
+            return _context.BankTransactions.Any(e => e.Id == id);
         }
     }
 }

@@ -1,0 +1,117 @@
+﻿@model ImpulseBudget.Models.BankTransactionImportPreviewViewModel
+
+@{
+    ViewData["Title"] = "Bank Transactions Import Preview";
+}
+
+<div class="container mt-4">
+    <h2>Bank Transactions Import – Preview</h2>
+
+    <p>
+        Source: @Model.SourceLabel<br />
+        Review the transactions below. Check the ones you want to import, then click
+        <strong>Import Selected</strong>.
+    </p>
+
+    <div class="alert alert-info">
+        <ul class="mb-0">
+            <li>Rows highlighted in <span class="badge bg-warning text-dark">yellow</span> are potential duplicates of existing transactions.</li>
+            <li>By default, duplicates are <strong>unchecked</strong>. You can choose to import them anyway.</li>
+            <li>Use the buttons below to quickly select/deselect duplicates or all rows.</li>
+        </ul>
+    </div>
+
+    <div class="mb-3">
+        <button type="button" class="btn btn-sm btn-secondary me-2" onclick="selectAll(true)">Select all</button>
+        <button type="button" class="btn btn-sm btn-secondary me-2" onclick="selectAll(false)">Deselect all</button>
+        <button type="button" class="btn btn-sm btn-secondary me-2" onclick="toggleDuplicates(false)">Deselect duplicates</button>
+        <button type="button" class="btn btn-sm btn-secondary" onclick="toggleDuplicates(true)">Select duplicates</button>
+    </div>
+
+    <form asp-action="ConfirmBankTransactionsImport" method="post">
+        @Html.AntiForgeryToken()
+        <div class="table-responsive">
+            <table class="table table-sm table-striped">
+                <thead>
+                    <tr>
+                        <th>Import?</th>
+                        <th>Date</th>
+                        <th>Description</th>
+                        <th class="text-end">Amount</th>
+                        <th>Type</th>
+                        <th>Status</th>
+                        <th>Duplicate?</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @for (var i = 0; i < Model.Rows.Count; i++)
+                    {
+                        var row = Model.Rows[i];
+                        string rowClass = row.DuplicateSeverity switch
+                        {
+                            ImpulseBudget.Models.DuplicateSeverity.Likely => "table-danger",  // pink/red
+                            ImpulseBudget.Models.DuplicateSeverity.Possible => "table-warning", // yellow
+                            _ => ""
+                        };
+
+                        <tr class="@rowClass">
+                            <td>
+                                <input type="checkbox" asp-for="Rows[@i].Import" class="import-checkbox" />
+                                @* keep hidden fields so model binding round-trips everything *@
+                                <input type="hidden" asp-for="Rows[@i].IsDuplicate" class="is-duplicate-flag" />
+                                <input type="hidden" asp-for="Rows[@i].Date" />
+                                <input type="hidden" asp-for="Rows[@i].Description" />
+                                <input type="hidden" asp-for="Rows[@i].Amount" />
+                                <input type="hidden" asp-for="Rows[@i].Type" />
+                                <input type="hidden" asp-for="Rows[@i].Status" />
+                            </td>
+                            <td>@row.Date.ToShortDateString()</td>
+                            <td>@row.Description</td>
+                            <td class="text-end">@row.Amount.ToString("C")</td>
+                            <td>@row.Type</td>
+                            <td>@row.Status</td>
+                            <td>
+                                @switch (row.DuplicateSeverity)
+                                {
+                                    case ImpulseBudget.Models.DuplicateSeverity.Likely:
+                                        @:Likely duplicate
+                                        break;
+                                    case ImpulseBudget.Models.DuplicateSeverity.Possible:
+                                        @:Possible duplicate
+                                        break;
+                                    default:
+                                        @:No
+                                        break;
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <button type="submit" class="btn btn-primary mt-3">Import Selected</button>
+        <a asp-action="Index" class="btn btn-link mt-3">Cancel</a>
+    </form>
+</div>
+
+@section Scripts {
+    <script>
+        function selectAll(val) {
+            document.querySelectorAll(".import-checkbox").forEach(cb => cb.checked = val);
+        }
+
+        function toggleDuplicates(val) {
+            const rows = document.querySelectorAll("tr");
+            rows.forEach(row => {
+                const dupFlag = row.querySelector(".is-duplicate-flag");
+                const checkbox = row.querySelector(".import-checkbox");
+                if (dupFlag && checkbox) {
+                    if (dupFlag.value.toLowerCase() === "true") {
+                        checkbox.checked = val;
+                    }
+                }
+            });
+        }
+    </script>
+}

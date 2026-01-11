@@ -1,19 +1,22 @@
-﻿using System.Globalization;
-using System.Text;
-using ImpulseBudget.Models;
+﻿using ImpulseBudget.Models;
+using ImpulseBudget.Services;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.AspNetCore.Http;
+using System.Globalization;
+using System.Text;
 
 namespace ImpulseBudget.Controllers
 {
     public class ImportController : Controller
     {
         private readonly ApplicationDbContext _db;
+        private readonly RecurringDetectionService _recurring;
 
-        public ImportController(ApplicationDbContext db)
+        public ImportController(ApplicationDbContext db, RecurringDetectionService recurring)
         {
-            _db = db;
+            _db = db; 
+            _recurring = recurring;
         }
 
         // Simple view that shows all three import sections + messages
@@ -55,6 +58,330 @@ namespace ImpulseBudget.Controllers
             sb.AppendLine("Visa Card,3000.00,24.99,100.00,2026-02-10,false");
             var bytes = Encoding.UTF8.GetBytes(sb.ToString());
             return File(bytes, "text/csv", "DebtsTemplate.csv");
+        }
+
+        // ---------- IMPORT BANK TRANSACTIONS: STEP 1 (PREVIEW) ----------
+
+        [HttpPost]
+        public async Task<IActionResult> ImportBankTransactions(IFormFile file)
+        {
+            if (file == null || file.Length == 0)
+            {
+                var errorModel = new ImportResultViewModel();
+                errorModel.Errors.Add("No file was uploaded for bank transactions.");
+                return View("Index", errorModel);
+            }
+
+            var preview = new BankTransactionImportPreviewViewModel
+            {
+                SourceLabel = "SOFI (or similar CSV)"
+            };
+
+            try
+            {
+                using var stream = file.OpenReadStream();
+                using var reader = new StreamReader(stream);
+
+                // Read header
+                var headerLine = await reader.ReadLineAsync();
+                if (headerLine == null)
+                {
+                    var errorModel = new ImportResultViewModel();
+                    errorModel.Errors.Add("The bank transactions file is empty.");
+                    return View("Index", errorModel);
+                }
+
+                var headerParts = headerLine.Split(',').Select(h => h.Trim()).ToArray();
+
+                // Build a dictionary headerName -> index for flexible mapping
+                var headerMap = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                for (int i = 0; i < headerParts.Length; i++)
+                {
+                    headerMap[headerParts[i]] = i;
+                }
+
+                // We require at least Date, Description, Amount
+                if (!TryGetIndex(headerMap, "Date", out var idxDate) ||
+                    !TryGetIndex(headerMap, "Description", out var idxDesc) ||
+                    !TryGetIndex(headerMap, "Amount", out var idxAmount))
+                {
+                    var errorModel = new ImportResultViewModel();
+                    errorModel.Errors.Add("The bank CSV must contain at least 'Date', 'Description', and 'Amount' columns.");
+                    errorModel.Errors.Add("Detected header: " + headerLine);
+                    return View("Index", errorModel);
+                }
+
+                // Optional columns
+                TryGetIndex(headerMap, "Type", out var idxType);
+                if (!idxType.HasValue && TryGetIndex(headerMap, "Transaction Type", out var tmpType))
+                    idxType = tmpType;
+
+                TryGetIndex(headerMap, "Status", out var idxStatus);
+
+                int rowNumber = 2;
+                var rows = new List<BankTransactionImportRow>();
+
+                while (!reader.EndOfStream)
+                {
+                    var line = await reader.ReadLineAsync();
+                    if (string.IsNullOrWhiteSpace(line) || line.TrimStart().StartsWith("#"))
+                    {
+                        rowNumber++;
+                        continue;
+                    }
+
+                    var parts = line.Split(',');
+
+                    // Normalize to length of header
+                    if (parts.Length < headerParts.Length)
+                    {
+                        Array.Resize(ref parts, headerParts.Length);
+                    }
+
+                    for (int i = 0; i < parts.Length; i++)
+                        parts[i] = parts[i]?.Trim() ?? string.Empty;
+
+                    var dateStr = SafeGet(parts, idxDate.Value);
+                    var descStr = SafeGet(parts, idxDesc.Value);
+                    var amountStr = SafeGet(parts, idxAmount.Value);
+                    var typeStr = idxType.HasValue ? SafeGet(parts, idxType.Value) : null;
+                    var statusStr = idxStatus.HasValue ? SafeGet(parts, idxStatus.Value) : null;
+
+                    // Parse date and amount with your existing helpers
+                    if (!TryParseDate(dateStr, out var date, out var dateErr) ||
+                        !TryParseDecimal(amountStr, out var amount, out var amountErr))
+                    {
+                        // Skip completely invalid rows, but you could also collect errors instead
+                        rowNumber++;
+                        continue;
+                    }
+
+                    var row = new BankTransactionImportRow
+                    {
+                        Date = date,
+                        Description = descStr,
+                        Amount = amount,
+                        Type = typeStr,
+                        Status = statusStr,
+                        Import = true // default to import; we may turn this off for duplicates
+                    };
+
+                    rows.Add(row);
+                    rowNumber++;
+                }
+
+                // Duplicate detection vs existing DB
+                await MarkDuplicatesAsync(rows);
+
+                preview.Rows = rows;
+            }
+            catch (Exception ex)
+            {
+                var errorModel = new ImportResultViewModel();
+                errorModel.Errors.Add("Unexpected error while reading bank transactions file: " + ex.Message);
+                return View("Index", errorModel);
+            }
+
+            // Show preview to user
+            return View("ImportBankTransactionsPreview", preview);
+        }
+
+        // Helper: check if header exists
+        private bool TryGetIndex(Dictionary<string, int> map, string name, out int? index)
+        {
+            if (map.TryGetValue(name, out var idx))
+            {
+                index = idx;
+                return true;
+            }
+
+            index = null;
+            return false;
+        }
+
+        // Helper: safe array access
+        private string SafeGet(string[] parts, int index)
+        {
+            return index >= 0 && index < parts.Length ? parts[index] : string.Empty;
+        }
+
+        // Duplicate detection: Date + Amount + Description (case-insensitive) already exists in DB?
+        private async Task MarkDuplicatesAsync(List<BankTransactionImportRow> rows)
+        {
+            if (!rows.Any())
+                return;
+
+            var dates = rows.Select(r => r.Date.Date).Distinct().ToList();
+            var amounts = rows.Select(r => r.Amount).Distinct().ToList();
+
+            // Pull only candidates with matching date + amount once
+            var candidates = await _db.BankTransactions
+                .Where(t => dates.Contains(t.Date.Date) && amounts.Contains(t.Amount))
+                .ToListAsync();
+
+            foreach (var row in rows)
+            {
+                var sameDayAndAmount = candidates
+                    .Where(t => t.Date.Date == row.Date.Date && t.Amount == row.Amount)
+                    .ToList();
+
+                if (!sameDayAndAmount.Any())
+                {
+                    row.IsDuplicate = false;
+                    row.DuplicateSeverity = DuplicateSeverity.None;
+                    continue;
+                }
+
+                // Compute best description similarity vs existing transactions
+                double bestScore = 0.0;
+                foreach (var t in sameDayAndAmount)
+                {
+                    var score = DescriptionSimilarity(row.Description, t.Description);
+                    if (score > bestScore)
+                        bestScore = score;
+                }
+
+                if (bestScore >= 0.85)        // very close / equal -> likely duplicate (pink)
+                {
+                    row.IsDuplicate = true;
+                    row.DuplicateSeverity = DuplicateSeverity.Likely;
+                }
+                else if (bestScore >= 0.6)    // somewhat similar -> possible duplicate (yellow)
+                {
+                    row.IsDuplicate = true;
+                    row.DuplicateSeverity = DuplicateSeverity.Possible;
+                }
+                else                          // same date+amount, but descriptions differ enough
+                {
+                    row.IsDuplicate = false;
+                    row.DuplicateSeverity = DuplicateSeverity.None;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Very simple token-based similarity 0..1.
+        /// 1 = identical, 0 = no shared tokens.
+        /// </summary>
+        private static double DescriptionSimilarity(string a, string b)
+        {
+            if (string.IsNullOrWhiteSpace(a) || string.IsNullOrWhiteSpace(b))
+                return 0.0;
+
+            var tokensA = Tokenize(a);
+            var tokensB = Tokenize(b);
+
+            if (tokensA.Count == 0 || tokensB.Count == 0)
+                return 0.0;
+
+            var intersection = tokensA.Intersect(tokensB).Count();
+            var union = tokensA.Union(tokensB).Count();
+
+            return union == 0 ? 0.0 : (double)intersection / union;
+        }
+
+        private static HashSet<string> Tokenize(string s)
+        {
+            return s
+                .ToLowerInvariant()
+                .Split(' ', '\t', '\r', '\n', ',', '.', '-', '/', '\\', '(', ')', '[', ']', ':', ';', '!', '?', '"', '\'')
+                .Where(t => t.Length > 2) // ignore tiny words like "of", "to"
+                .ToHashSet();
+        }
+
+        // ---------- IMPORT BANK TRANSACTIONS: STEP 2 (CONFIRM) ----------
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ConfirmBankTransactionsImport(
+    [FromForm] BankTransactionImportPreviewViewModel model)
+        {
+            var keys = Request.Form.Keys.ToList();
+            var contentType = Request.ContentType;
+            var method = Request.Method;
+
+            if (model == null || model.Rows == null)
+            {
+                var result = new ImportResultViewModel();
+                result.Errors.Add("No transaction data was submitted. Please upload the CSV again.");
+                return View("Index", result);
+            }
+
+            var errors = new List<string>();
+
+            var toImport = model.Rows
+                .Where(r => r.Import)
+                .ToList();
+
+            if (!toImport.Any())
+            {
+                var result = new ImportResultViewModel();
+                result.Errors.Add("No transactions were selected for import.");
+                return View("Index", result);
+            }
+
+            var entities = new List<BankTransaction>();
+
+            // Preload candidate existing transactions only once:
+            var importDates = toImport.Select(r => r.Date.Date).Distinct().ToList();
+            var importAmounts = toImport.Select(r => r.Amount).Distinct().ToList();
+
+            var existingCandidates = await _db.BankTransactions
+                .Where(t => importDates.Contains(t.Date.Date) && importAmounts.Contains(t.Amount))
+                .ToListAsync();
+
+            foreach (var row in toImport)
+            {
+                var rowDate = row.Date.Date;
+                var candidates = existingCandidates
+                    .Where(t => t.Date.Date == rowDate && t.Amount == row.Amount)
+                    .ToList();
+
+                var isRealDuplicate = false;
+
+                foreach (var t in candidates)
+                {
+                    var score = DescriptionSimilarity(row.Description, t.Description);
+                    if (score >= 0.85) // same threshold as "Likely"
+                    {
+                        isRealDuplicate = true;
+                        break;
+                    }
+                }
+
+                if (isRealDuplicate)
+                {
+                    // skip inserting an obvious duplicate
+                    continue;
+                }
+                entities.Add(new BankTransaction
+                {
+                    Date = row.Date,
+                    Description = row.Description,
+                    Amount = row.Amount,
+                    Category = row.Type,
+                    IsImported = true,
+                    IsIncoming = row.Amount > 0
+                });
+            }
+
+            if (!entities.Any())
+            {
+                var result = new ImportResultViewModel();
+                result.Errors.Add("No new transactions were imported (all selected rows were duplicates that already exist).");
+                return View("Index", result);
+            }
+
+            await _db.BankTransactions.AddRangeAsync(entities);
+            await _db.SaveChangesAsync();
+
+            var success = new ImportResultViewModel
+            {
+                SuccessMessage = $"Successfully imported {entities.Count} transactions.",
+                RecurringSuggestions = await _recurring.FindRecurringAsync()
+            };
+
+            return View("Index", success);
         }
 
         // ---------- IMPORT INCOME ----------
@@ -658,14 +985,5 @@ namespace ImpulseBudget.Controllers
 
             return View("Index", result);
         }
-    }
-
-    public class ImportResultViewModel
-    {
-        // All validation / parsing errors
-        public List<string> Errors { get; set; } = new();
-
-        // Success message when an import completes
-        public string? SuccessMessage { get; set; }
     }
 }

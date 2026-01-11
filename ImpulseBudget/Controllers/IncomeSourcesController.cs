@@ -152,5 +152,20 @@ namespace ImpulseBudget.Controllers
         {
             return _context.IncomeSources.Any(e => e.Id == id);
         }
+
+        public IActionResult CreateFromTransaction(string description, decimal amount)
+        {
+            var model = new IncomeSource
+            {
+                Name = description,
+                Amount = amount,
+                Frequency = Frequency.Monthly, // sane default
+                StartDate = DateTime.Today,
+                IsActive = true
+            };
+
+            return View("Create", model);
+        }
+
     }
 }

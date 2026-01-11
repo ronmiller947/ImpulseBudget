@@ -1,4 +1,4 @@
-﻿@model ImpulseBudget.Controllers.ImportResultViewModel
+﻿@model ImpulseBudget.Models.ImportResultViewModel
 
 @{
     ViewData["Title"] = "CSV Import";
@@ -25,6 +25,78 @@
     {
         <div class="alert alert-success">
             @Model.SuccessMessage
+        </div>
+    }
+
+    @if (Model.RecurringSuggestions != null && Model.RecurringSuggestions.Any())
+    {
+        <div class="alert alert-secondary mt-3">
+            <h5 class="mb-2">Potential recurring items detected</h5>
+            <p class="mb-2">
+                These transactions look like recurring patterns. You can quickly create
+                recurring income, bills, or debts from them.
+            </p>
+
+            <div class="table-responsive">
+                <table class="table table-sm table-striped">
+                    <thead>
+                        <tr>
+                            <th>Description</th>
+                            <th class="text-end">Amount</th>
+                            <th>Occurrences</th>
+                            <th>First seen</th>
+                            <th>Last seen</th>
+                            <th>Suggested as</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var s in Model.RecurringSuggestions)
+                        {
+                            <tr>
+                                <td>@s.Description</td>
+                                <td class="text-end">@s.Amount.ToString("C")</td>
+                                <td>@s.OccurrenceCount</td>
+                                <td>@s.FirstDate.ToShortDateString()</td>
+                                <td>@s.LastDate.ToShortDateString()</td>
+                                <td>@s.SuggestedType</td>
+                                <td>
+                                    @if (s.SuggestedType == "Income")
+                                    {
+                                        <a asp-controller="IncomeSources"
+                                           asp-action="CreateFromTransaction"
+                                           asp-route-description="@s.Description"
+                                           asp-route-amount="@s.Amount"
+                                           class="btn btn-sm btn-outline-success">
+                                            Add as Income
+                                        </a>
+                                    }
+                                    else if (s.SuggestedType == "Debt")
+                                    {
+                                        <a asp-controller="Debts"
+                                           asp-action="CreateFromTransaction"
+                                           asp-route-description="@s.Description"
+                                           asp-route-amount="@Math.Abs(s.Amount)"
+                                           class="btn btn-sm btn-outline-danger">
+                                            Add as Debt
+                                        </a>
+                                    }
+                                    else
+                                    {
+                                        <a asp-controller="Bills"
+                                           asp-action="CreateFromTransaction"
+                                           asp-route-description="@s.Description"
+                                           asp-route-amount="@Math.Abs(s.Amount)"
+                                           class="btn btn-sm btn-outline-primary">
+                                            Add as Bill
+                                        </a>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
         </div>
     }
 
@@ -101,5 +173,30 @@
                 </div>
             </div>
         </div>
+
+        <div class="col-md-4 mb-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5>Import Bank Transactions</h5>
+                    <p>
+                        Upload a CSV exported from your bank (e.g., SOFI).<br />
+                        The app will:
+                    </p>
+                    <ul>
+                        <li>Parse dates and amounts</li>
+                        <li>Detect possible duplicates vs existing transactions</li>
+                        <li>Let you choose which rows to import</li>
+                    </ul>
+
+                    <form asp-action="ImportBankTransactions" method="post" enctype="multipart/form-data">
+                        <div class="mb-2">
+                            <input type="file" name="file" class="form-control" accept=".csv" />
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-sm">Upload Transactions CSV</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
     </div>
 </div>

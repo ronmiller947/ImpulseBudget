@@ -152,5 +152,20 @@ namespace ImpulseBudget.Controllers
         {
             return _context.Debts.Any(e => e.Id == id);
         }
+
+        public IActionResult CreateFromTransaction(string description, decimal amount)
+        {
+            var model = new Debt
+            {
+                Name = description,
+                Balance = 0,
+                AprPercent = 0, // you'll update this manually
+                MinimumPayment = amount,
+                NextDueDate = DateTime.Today,
+                IsEssential = false
+            };
+
+            return View("Create", model);
+        }
     }
 }

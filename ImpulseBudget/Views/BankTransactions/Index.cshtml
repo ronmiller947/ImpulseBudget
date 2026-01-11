@@ -1,0 +1,77 @@
+@model IEnumerable<ImpulseBudget.Models.BankTransaction>
+
+@{
+    ViewData["Title"] = "Transactions";
+}
+
+<h1>@ViewData["Title"]</h1>
+
+<p>
+    <a asp-action="Create">Create New</a>
+</p>
+<table class="table">
+    <thead>
+        <tr>
+            <th>
+                @Html.DisplayNameFor(model => model.Date)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.Description)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.Amount)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.Category)
+            </th>
+            <th>
+                @Html.DisplayNameFor(model => model.IsImported)
+            </th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+@foreach (var item in Model) {
+        <tr>
+            <td>
+                @Html.DisplayFor(modelItem => item.Date)
+            </td>
+            <td>
+                @Html.DisplayFor(modelItem => item.Description)
+            </td>
+            <td>
+                @Html.DisplayFor(modelItem => item.Amount)
+            </td>
+            <td>
+                @Html.DisplayFor(modelItem => item.Category)
+            </td>
+            <td>
+                @Html.DisplayFor(modelItem => item.IsImported)
+            </td>
+            <td>
+                <a asp-action="Edit" asp-route-id="@item.Id">Edit</a> |
+                <a asp-action="Details" asp-route-id="@item.Id">Details</a> |
+                <a asp-action="Delete" asp-route-id="@item.Id">Delete</a> |
+                <a asp-controller="Bills"
+                    asp-action="CreateFromTransaction"
+                    asp-route-description="@item.Description"
+                    asp-route-amount="@Math.Abs(item.Amount)">
+                    Make Bill
+                </a> |
+                <a asp-controller="IncomeSources"
+                    asp-action="CreateFromTransaction"
+                    asp-route-description="@item.Description"
+                    asp-route-amount="@item.Amount">
+                    Make Income
+                </a> |
+                <a asp-controller="Debts"
+                    asp-action="CreateFromTransaction"
+                    asp-route-description="@item.Description"
+                    asp-route-amount="@Math.Abs(item.Amount)">
+                    Make Debt
+                </a>
+            </td>
+        </tr>
+}
+    </tbody>
+</table>
