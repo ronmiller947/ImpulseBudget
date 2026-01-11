@@ -1,4 +1,5 @@
 ﻿using ImpulseBudget.Models;
+using ImpulseBudget.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -7,18 +8,28 @@ namespace ImpulseBudget.Controllers
     public class DashboardController : Controller
     {
         private readonly ApplicationDbContext _db;
+        private readonly BudgetProjectionService _projectionService;
 
-        public DashboardController(ApplicationDbContext db)
+        public DashboardController(
+            ApplicationDbContext db,
+            BudgetProjectionService projectionService)
         {
             _db = db;
+            _projectionService = projectionService;
         }
 
-        public async Task<IActionResult> Index()
+        // startingBalance is optional query parameter (?startingBalance=123.45)
+        public async Task<IActionResult> Index(decimal? startingBalance)
         {
             var incomeCount = await _db.IncomeSources.CountAsync();
             var billCount = await _db.Bills.CountAsync();
             var debtCount = await _db.Debts.CountAsync();
             var txCount = await _db.BankTransactions.CountAsync();
+
+            var startBal = startingBalance ?? 0m;
+
+            var projection = await _projectionService
+                .GetWeeklyProjectionAsync(startBal, weeks: 26);
 
             var model = new DashboardViewModel
             {
@@ -26,7 +37,8 @@ namespace ImpulseBudget.Controllers
                 BillCount = billCount,
                 DebtCount = debtCount,
                 TransactionCount = txCount,
-                Projection = new List<ProjectionPoint>() // empty for now
+                StartingBalance = startBal,
+                Projection = projection
             };
 
             return View(model);
@@ -39,6 +51,8 @@ namespace ImpulseBudget.Controllers
         public int BillCount { get; set; }
         public int DebtCount { get; set; }
         public int TransactionCount { get; set; }
+
+        public decimal StartingBalance { get; set; }
 
         public List<ProjectionPoint> Projection { get; set; } = new();
     }

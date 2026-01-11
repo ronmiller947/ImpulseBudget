@@ -1,3 +1,4 @@
+using ImpulseBudget.Services;
 using ImpulseBudget.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -10,6 +11,8 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
+
+builder.Services.AddScoped<BudgetProjectionService>();
 
 builder.Services.AddControllersWithViews();
 

@@ -9,22 +9,30 @@ namespace ImpulseBudget.Models
 
         [Required]
         [MaxLength(200)]
+        [Display(Name = "Debt name")]
         public string Name { get; set; } = string.Empty;
 
         [Required]
         [Column(TypeName = "decimal(18,2)")]
+        [Display(Name = "Current balance")]
         public decimal Balance { get; set; }
 
         [Required]
         [Column(TypeName = "decimal(5,2)")]
-        public decimal AprPercent { get; set; } // 24.99
+        [Display(Name = "APR (%)")]
+        public decimal AprPercent { get; set; }
 
         [Column(TypeName = "decimal(18,2)")]
+        [Display(Name = "Minimum payment")]
         public decimal MinimumPayment { get; set; }
 
         [Required]
+        [DataType(DataType.Date)]
+        [Display(Name = "Next due date")]
         public DateTime NextDueDate { get; set; }
 
+        [Display(Name = "Essential debt")]
         public bool IsEssential { get; set; } = false;
     }
+
 }
